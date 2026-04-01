@@ -52,14 +52,16 @@ public class DebugRenderer
         White = 0,
         Red = 1,
         Green = 2,
-        NumColor = 3
+        Blue = 3,
+        NumColor = 4
     }
 
     private readonly Vector4[] colors =
     {
         new(1, 1, 1, 1),
         new(1, 0, 0, 1),
-        new(0, 1, 0, 1)
+        new(0, 1, 0, 1),
+        new(0.15f, 0.45f, 1.0f, 0.45f)   // semi-transparent blue for water surfaces
     };
 
     private struct Line
@@ -124,6 +126,46 @@ public class DebugRenderer
         return result;
     }
 
+    private class TriangleBuffer
+    {
+        public Vector3[] Vertices = new Vector3[256];
+        public TriangleVertexIndex[] Indices = new TriangleVertexIndex[256];
+
+        public int VertexCount;
+        public int IndexCount;
+
+        public void Add(float x, float y, float z)
+        {
+            if (VertexCount == Vertices.Length)
+                Array.Resize(ref Vertices, VertexCount * 2);
+
+            Vertices[VertexCount++] = new Vector3(x, y, z);
+        }
+
+        public void Add(uint i0, uint i1, uint i2)
+        {
+            if (IndexCount == Indices.Length)
+                Array.Resize(ref Indices, IndexCount * 2);
+
+            Indices[IndexCount++] = new TriangleVertexIndex(i0, i1, i2);
+        }
+
+        public void Clear()
+        {
+            VertexCount = IndexCount = 0;
+        }
+    }
+
+    private readonly TriangleBuffer[] triangleBuffers = CreateTriangleBuffers();
+
+    private static TriangleBuffer[] CreateTriangleBuffers()
+    {
+        var result = new TriangleBuffer[(int)Color.NumColor];
+        for (int i = 0; i < result.Length; i++)
+            result[i] = new TriangleBuffer();
+        return result;
+    }
+
     private VertexArrayObject vao = null!;
     private LineShader shader = null!;
     private ArrayBuffer ab = null!;
@@ -155,6 +197,27 @@ public class DebugRenderer
             GLDevice.DrawElements(DrawMode.Lines, lines.IndexCount * 2, IndexType.UnsignedInt, 0);
 
             lines.Clear();
+        }
+
+        // Draw semi-transparent triangles (e.g. water surfaces) with alpha blending.
+        // Back-face culling is disabled so surfaces are visible from both sides.
+        GLDevice.Enable(Capability.Blend);
+        GLDevice.SetBlendFunction(BlendFunction.SourceAlpha, BlendFunction.OneMinusSourceAlpha);
+        GLDevice.Disable(Capability.CullFace);
+
+        for (int i = 0; i < (int)Color.NumColor; i++)
+        {
+            var tris = triangleBuffers[i];
+
+            if (tris.IndexCount == 0) continue;
+
+            eab.SetData(tris.Indices, tris.IndexCount);
+            ab.SetData(tris.Vertices, tris.VertexCount);
+
+            shader.Color.Set(colors[i]);
+            GLDevice.DrawElements(DrawMode.Triangles, tris.IndexCount * 3, IndexType.UnsignedInt, 0);
+
+            tris.Clear();
         }
 
         GLDevice.Disable(Capability.Blend);
@@ -216,6 +279,16 @@ public class DebugRenderer
         list.Add(offset + 0, offset + 1);
         list.Add(offset + 2, offset + 3);
         list.Add(offset + 4, offset + 5);
+    }
+
+    public void PushTriangle(Color color, in Vector3 v0, in Vector3 v1, in Vector3 v2)
+    {
+        var buf = triangleBuffers[(int)color];
+        uint offset = (uint)buf.VertexCount;
+        buf.Add(v0.X, v0.Y, v0.Z);
+        buf.Add(v1.X, v1.Y, v1.Z);
+        buf.Add(v2.X, v2.Y, v2.Z);
+        buf.Add(offset, offset + 1, offset + 2);
     }
 
     public void Load()
