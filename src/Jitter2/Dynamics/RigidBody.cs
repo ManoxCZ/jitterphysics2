@@ -614,6 +614,18 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     public bool AffectedByGravity { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets whether this body receives buoyancy and drag forces from water surfaces
+    /// registered with <see cref="World.Buoyancy"/>.
+    /// </summary>
+    /// <remarks>
+    /// Only applies when <see cref="MotionType"/> is <see cref="MotionType.Dynamic"/>.
+    /// Buoyancy forces are applied during <see cref="World.PreSubStep"/> via
+    /// <see cref="Buoyancy.BuoyancySystem"/>.
+    /// Default is <see langword="false"/>.
+    /// </remarks>
+    public bool AffectedByBuoyancy { get; set; } = false;
+
+    /// <summary>
     /// A managed pointer to custom user data. This is not utilized by the engine.
     /// </summary>
     public object? Tag { get; set; }

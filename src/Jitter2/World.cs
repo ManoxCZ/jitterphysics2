@@ -13,6 +13,7 @@ using Jitter2.Collision;
 using Jitter2.Collision.Shapes;
 using Jitter2.DataStructures;
 using Jitter2.Dynamics;
+using Jitter2.Dynamics.Buoyancy;
 using Jitter2.Dynamics.Constraints;
 using Jitter2.LinearMath;
 using Jitter2.Unmanaged;
@@ -296,6 +297,13 @@ public sealed partial class World : IDisposable
     /// </summary>
     public JVector Gravity { get; set; } = new(0, -(Real)9.81, 0);
 
+    /// <summary>
+    /// Manages water surfaces and applies buoyancy forces to rigid bodies with
+    /// <see cref="RigidBody.AffectedByBuoyancy"/> set to <see langword="true"/>.
+    /// Add water surfaces via <see cref="BuoyancySystem.Add"/>.
+    /// </summary>
+    public BuoyancySystem Buoyancy { get; }
+
     // Make this global since it is used by nearly every method called
     // in World.Step.
     private int solverIterations = 6;
@@ -322,6 +330,8 @@ public sealed partial class World : IDisposable
         NullBody.MotionType = MotionType.Static;
 
         DynamicTree = new DynamicTree(DefaultDynamicTreeFilter);
+
+        Buoyancy = new BuoyancySystem(this);
 
         InitParallelCallbacks();
     }
